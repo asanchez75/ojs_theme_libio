@@ -8,30 +8,38 @@
  * Distributed under the GNU GPL v3. For full terms see the file docs/COPYING.
  *
  * @class LibioThemePlugin
- * @ingroup plugins_themes.libio
  *
  * @brief Libio theme
  */
 
-import('lib.pkp.classes.plugins.ThemePlugin');
+namespace APP\plugins\themes\libio;
 
-class LibioThemePlugin extends ThemePlugin {
-	/**
-	 * @copydoc ThemePlugin::isActive()
-	 */
-	public function isActive() {
-		if (defined('SESSION_DISABLE_INIT')) return true;
-		return parent::isActive();
-	}
+use APP\core\Application;
+use APP\file\PublicFileManager;
+use PKP\config\Config;
+use PKP\session\SessionManager;
 
-	/**
-	 * Initialize the theme's styles, scripts and hooks. This is run on the
-	 * currently active theme and it's parent themes.
-	 *
-	 * @return null
-	 */
-	public function init() {
-		AppLocale::requireComponents(LOCALE_COMPONENT_PKP_MANAGER, LOCALE_COMPONENT_APP_MANAGER);
+class LibioThemePlugin extends \PKP\plugins\ThemePlugin
+{
+    /**
+     * @copydoc ThemePlugin::isActive()
+     */
+    public function isActive()
+    {
+        if (SessionManager::isDisabled()) {
+            return true;
+        }
+        return parent::isActive();
+    }
+
+    /**
+     * Initialize the theme's styles, scripts and hooks. This is run on the
+     * currently active theme and it's parent themes.
+     *
+     */
+    public function init()
+    {
+		//AppLocale::requireComponents(LOCALE_COMPONENT_PKP_MANAGER, LOCALE_COMPONENT_APP_MANAGER);
 
 		// Register theme options
 		$this->addOption('typography', 'FieldOptions', [
@@ -102,8 +110,8 @@ class LibioThemePlugin extends ThemePlugin {
 		// Load primary stylesheet
 		$this->addStyle('stylesheet', 'styles/index.less');
 
-		// Store additional LESS variables to process based on options
-		$additionalLessVariables = array();
+        // Store additional LESS variables to process based on options
+        $additionalLessVariables = [];
 
 		if ($this->getOption('typography') === 'notoSerif') {
 			$this->addStyle('font', 'styles/fonts/notoSerif.less');
@@ -137,46 +145,42 @@ class LibioThemePlugin extends ThemePlugin {
 			}
 		}
 
-		// Pass additional LESS variables based on options
-		if (!empty($additionalLessVariables)) {
-			$this->modifyStyle('stylesheet', array('addLessVariables' => join("\n", $additionalLessVariables)));
-		}
+        // Pass additional LESS variables based on options
+        if (!empty($additionalLessVariables)) {
+            $this->modifyStyle('stylesheet', ['addLessVariables' => join("\n", $additionalLessVariables)]);
+        }
 
 		$request = Application::get()->getRequest();
 
 		// Load icon font FontAwesome - http://fontawesome.io/
-		$this->addStyle(
-			'fontAwesome',
-			$request->getBaseUrl() . '/lib/pkp/styles/fontawesome/fontawesome.css',
-			array('baseUrl' => '')
-		);
+        $this->addStyle(
+            'fontAwesome',
+            $request->getBaseUrl() . '/lib/pkp/styles/fontawesome/fontawesome.css',
+            ['baseUrl' => '']
+        );
 
-		// Get homepage image and use as header background if useAsHeader is true
-		$context = Application::get()->getRequest()->getContext();
-		if ($context && $this->getOption('useHomepageImageAsHeader')) {
+        // Get homepage image and use as header background if useAsHeader is true
+        $context = Application::get()->getRequest()->getContext();
+        if ($context && $this->getOption('useHomepageImageAsHeader') && ($homepageImage = $context->getLocalizedData('homepageImage'))) {
+            $publicFileManager = new PublicFileManager();
+            $publicFilesDir = $request->getBaseUrl() . '/' . $publicFileManager->getContextFilesPath($context->getId());
+            $homepageImageUrl = $publicFilesDir . '/' . $homepageImage['uploadName'];
 
-			$publicFileManager = new PublicFileManager();
-			$publicFilesDir = $request->getBaseUrl() . '/' . $publicFileManager->getContextFilesPath($context->getId());
-
-			$homepageImage = $context->getLocalizedData('homepageImage');
-
-			$homepageImageUrl = $publicFilesDir . '/' . $homepageImage['uploadName'];
-
-			$this->addStyle(
-				'homepageImage',
-				'.pkp_structure_head { background: center / cover no-repeat url("' . $homepageImageUrl . '");}',
-				['inline' => true]
-			);
-		}
+            $this->addStyle(
+                'homepageImage',
+                '.pkp_structure_head { background: center / cover no-repeat url("' . $homepageImageUrl . '");}',
+                ['inline' => true]
+            );
+        }
 
 		// Load jQuery from a CDN or, if CDNs are disabled, from a local copy.
 		$min = Config::getVar('general', 'enable_minified') ? '.min' : '';
 		$jquery = $request->getBaseUrl() . '/lib/pkp/lib/vendor/components/jquery/jquery' . $min . '.js';
 		$jqueryUI = $request->getBaseUrl() . '/lib/pkp/lib/vendor/components/jqueryui/jquery-ui' . $min . '.js';
-		// Use an empty `baseUrl` argument to prevent the theme from looking for
-		// the files within the theme directory
-		$this->addScript('jQuery', $jquery, array('baseUrl' => ''));
-		$this->addScript('jQueryUI', $jqueryUI, array('baseUrl' => ''));
+        // Use an empty `baseUrl` argument to prevent the theme from looking for
+        // the files within the theme directory
+        $this->addScript('jQuery', $jquery, ['baseUrl' => '']);
+        $this->addScript('jQueryUI', $jqueryUI, ['baseUrl' => '']);
 
 		// Load Bootsrap's dropdown
 		$this->addScript('popper', 'js/lib/popper/popper.js');
@@ -186,41 +190,53 @@ class LibioThemePlugin extends ThemePlugin {
 		// Load custom JavaScript for this theme
 		$this->addScript('default', 'js/main.js');
 
-		// Add navigation menu areas for this theme
-		$this->addMenuArea(array('primary', 'user'));
-	}
+        // Add navigation menu areas for this theme
+        $this->addMenuArea(['primary', 'user']);
+    }
 
-	/**
-	 * Get the name of the settings file to be installed on new journal
-	 * creation.
-	 * @return string
-	 */
-	function getContextSpecificPluginSettingsFile() {
-		return $this->getPluginPath() . '/settings.xml';
-	}
+    /**
+     * Get the name of the settings file to be installed on new journal
+     * creation.
+     *
+     * @return string
+     */
+    public function getContextSpecificPluginSettingsFile()
+    {
+        return $this->getPluginPath() . '/settings.xml';
+    }
 
-	/**
-	 * Get the name of the settings file to be installed site-wide when
-	 * OJS is installed.
-	 * @return string
-	 */
-	function getInstallSitePluginSettingsFile() {
-		return $this->getPluginPath() . '/settings.xml';
-	}
+    /**
+     * Get the name of the settings file to be installed site-wide when
+     * OJS is installed.
+     *
+     * @return string
+     */
+    public function getInstallSitePluginSettingsFile()
+    {
+        return $this->getPluginPath() . '/settings.xml';
+    }
 
-	/**
-	 * Get the display name of this plugin
-	 * @return string
-	 */
-	function getDisplayName() {
-		return __('plugins.themes.libio.name');
-	}
+    /**
+     * Get the display name of this plugin
+     *
+     * @return string
+     */
+    public function getDisplayName()
+    {
+        return __('plugins.themes.libio.name');
+    }
 
-	/**
-	 * Get the description of this plugin
-	 * @return string
-	 */
-	function getDescription() {
-		return __('plugins.themes.libio.description');
-	}
+    /**
+     * Get the description of this plugin
+     *
+     * @return string
+     */
+    public function getDescription()
+    {
+        return __('plugins.themes.libio.description');
+    }
+}
+
+if (!PKP_STRICT_MODE) {
+    class_alias('\APP\plugins\themes\libio\LibioThemePlugin', '\LibioThemePlugin');
 }
